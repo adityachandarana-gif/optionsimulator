@@ -1900,8 +1900,32 @@ def main():
         with tab_news:
             st.markdown('<div class="section-title">Finance Intelligence</div>', unsafe_allow_html=True)
             st.caption("Live AI-curated finance news from the companion Finance Intelligence platform.")
-            st.link_button("Open Finance Intelligence in a new tab", FINANCE_INTEL_URL, use_container_width=False)
-            components.iframe(FINANCE_INTEL_URL, height=900, scrolling=True)
+            
+            try:
+                import requests
+                api_url = "https://finance-intel-ruby.vercel.app/api/articles"
+                response = requests.get(api_url, timeout=5)
+                news_data = response.json()
+                
+                if "articles" in news_data and news_data["articles"]:
+                    cols = st.columns(2)
+                    for i, article in enumerate(news_data["articles"]):
+                        col = cols[i % 2]
+                        with col:
+                            with st.container(border=True):
+                                publisher = article.get('publisher', 'NEWS')
+                                category = article.get('category', 'Markets')
+                                st.caption(f"**{publisher}** • {category}")
+                                st.markdown(f"#### {article.get('title')}")
+                                st.write(article.get('summary', ''))
+                                # Use URL directly, checking if it exists
+                                url = article.get('url', FINANCE_INTEL_URL)
+                                st.link_button("Read full article", url)
+                else:
+                    st.info("No news articles found today.")
+            except Exception as e:
+                st.error("Could not load latest news at this time.")
+                st.link_button("Open Finance Intelligence", FINANCE_INTEL_URL)
 
         # ===== AUTO-PLAY =====
         # Each bar = 5 sim-minutes. 1 real second = 1 sim minute → 5s per bar at 1x.
