@@ -72,13 +72,13 @@ div[data-testid="stAppViewContainer"] > div:first-child { padding-top: 0 !import
     font-size: 15px;
     font-weight: 700;
     letter-spacing: 0.3px;
-    color: #ffffff;
+    color: #ffffff !important;
     line-height: 1.2;
 }
 .fixed-header p {
     margin: 2px 0 0 0;
     font-size: 11px;
-    color: #a8c5e2;
+    color: #a8c5e2 !important;
     font-weight: 500;
     line-height: 1.2;
 }
