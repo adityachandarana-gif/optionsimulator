@@ -1015,6 +1015,19 @@ def main():
             "GARCH(1,1) model (annualized vol 12%-18%). Optionally supply your own intraday "
             "data below -- either input overrides the default model."
         )
+        with st.expander("What you can explore", expanded=True):
+            st.markdown(
+                "**Option Market Simulator** lets you explore how option prices and portfolio "
+                "risk can change as the simulated NIFTY 50 market moves. You can place simulated "
+                "call and put orders, compare ITM/ATM/OTM strikes, review option Greeks, monitor "
+                "P&L and margin, and inspect the price path in the graph. The **Market News** tab "
+                "opens the companion Finance Intelligence news platform."
+            )
+            st.caption(
+                "Educational classroom tool only. Prices, fills, P&L, Greeks, and margin are "
+                "simulated and are not live market data, investment advice, or a recommendation "
+                "to trade."
+            )
         c1, c2 = st.columns(2)
         with c1:
             data_path = st.text_input("Data file path (optional)", value="", key="setup_path",
