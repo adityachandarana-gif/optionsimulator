@@ -2,6 +2,8 @@
 
 A Streamlit-based live trading simulator for exploring option pricing, implied volatility, Greeks, portfolio risk, margin, and simulated market paths.
 
+The simulator also includes a `Market News` tab that embeds the live [Finance Intelligence](https://finance-intel-ruby.vercel.app/) companion app.
+
 ## Run locally
 
 ```powershell

@@ -13,6 +13,7 @@ VOL_MIN, VOL_MAX = 0.12, 0.18
 TOTAL_EXPIRY_DAYS = 25
 PERSIST_PATH = os.path.join(os.path.dirname(os.path.abspath(__file__)), "oms_session_state.json")
 HOLD_DAYS = 22
+FINANCE_INTEL_URL = "https://finance-intel-ruby.vercel.app/"
 
 
 def initialize_session_state(session_state):

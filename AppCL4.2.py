@@ -16,7 +16,7 @@ from fpdf import FPDF
 import base64
 import streamlit.components.v1 as components
 from app_config import (
-    BAR_MINUTES, BARS_PER_DAY, DEFAULT_OPEN_PRICE, HOLD_DAYS, PERSIST_PATH,
+    BAR_MINUTES, BARS_PER_DAY, DEFAULT_OPEN_PRICE, FINANCE_INTEL_URL, HOLD_DAYS, PERSIST_PATH,
     SIM_DAYS, TICK_SECONDS_BASE, TOTAL_EXPIRY_DAYS, VOL_MAX, VOL_MIN,
     initialize_session_state,
 )
@@ -1316,8 +1316,8 @@ def main():
 
     # ==================== RIGHT PANEL ====================
     with col_right:
-        tab_place, tab_pos, tab_graph, tab_perf = st.tabs([
-            "Place Order", "Positions", "View Graph", "Performance and Reports"
+        tab_place, tab_pos, tab_graph, tab_perf, tab_news = st.tabs([
+            "Place Order", "Positions", "View Graph", "Performance and Reports", "Market News"
         ])
 
         # ---------- TAB 1: PLACE ORDER ----------
@@ -1828,6 +1828,13 @@ def main():
                         st.download_button("📥 Download PDF Report", f,
                                            file_name=os.path.basename(st.session_state.report_path),
                                            mime="application/pdf")
+
+        # ---------- TAB 5: MARKET NEWS ----------
+        with tab_news:
+            st.markdown('<div class="section-title">Finance Intelligence</div>', unsafe_allow_html=True)
+            st.caption("Live AI-curated finance news from the companion Finance Intelligence platform.")
+            st.link_button("Open Finance Intelligence in a new tab", FINANCE_INTEL_URL, use_container_width=False)
+            components.iframe(FINANCE_INTEL_URL, height=900, scrolling=True)
 
         # ===== AUTO-PLAY =====
         # Each bar = 5 sim-minutes. 1 real second = 1 sim minute → 5s per bar at 1x.
