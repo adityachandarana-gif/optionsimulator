@@ -31,7 +31,7 @@ def initialize_session_state(session_state):
         'current_price': DEFAULT_OPEN_PRICE, 'T_current': TOTAL_EXPIRY_DAYS / 365,
         'chain_df': None, 'starting_capital': 10000000.0,
         'peak_margin_used': 0.0, 'session_start_wall': None,
-        'data_source_choice': None, 'day_close_map': {},
+        'data_source_choice': None, 'day_close_map': {}, 'theme_mode': 'dark',
     }
     for key, value in defaults.items():
         if key not in session_state:

@@ -141,3 +141,29 @@ div[style*="font-size:18px"][style*="font-weight:700"] { color: #f8fafc !importa
 }
 </style>
 """
+
+
+def get_theme_css(theme_mode):
+  """Return presentation overrides for the selected dashboard theme."""
+  if theme_mode == 'light':
+    return """
+<style>
+:root { --bg: #f4f7fb; --surface: #ffffff; --surface-raised: #eef3f8; --border: #cbd5e1; --text: #172033; --muted: #526174; --focus: #1d4ed8; }
+.stApp { background: #f4f7fb !important; color: #172033 !important; }
+.card, .card-beige, [data-testid="stMetric"], .pnl-row { background: #ffffff !important; border-color: #cbd5e1 !important; box-shadow: 0 5px 14px rgba(30, 41, 59, .08) !important; }
+.nifty-price, [data-testid="stMetricValue"], [data-testid="stMarkdownContainer"] h1, [data-testid="stMarkdownContainer"] h2, [data-testid="stMarkdownContainer"] h3, .section-title, .pos-instrument, .margin-val, .subsection-title { color: #172033 !important; }
+.nifty-symbol, .pnl-label, .nifty-meta, .pos-meta, .margin-label, label, .stSelectbox label, .stNumberInput label, .stSlider label, [data-testid="stCaptionContainer"], [data-testid="stMarkdownContainer"] { color: #526174 !important; }
+[data-baseweb="select"] > div, [data-baseweb="input"] > div, [data-testid="stNumberInput"] input { background: #ffffff !important; color: #172033 !important; border-color: #94a3b8 !important; }
+.stTabs [data-baseweb="tab-list"] { background: #e8eef5 !important; border-color: #cbd5e1 !important; }
+.stTabs [data-baseweb="tab"] { color: #526174 !important; }
+.stTabs [aria-selected="true"] { background: #dbeafe !important; color: #1e3a8a !important; }
+.stButton > button, [data-testid="stDownloadButton"] > button, div[data-testid="stButton"] button { background: #ffffff !important; color: #1e3a8a !important; border-color: #60a5fa !important; }
+.stButton > button:hover, [data-testid="stDownloadButton"] > button:hover, div[data-testid="stButton"] button:hover { background: #eff6ff !important; }
+.theme-toggle button { min-height: 34px !important; padding: 4px 12px !important; font-size: 12px !important; }
+</style>
+"""
+  return """
+<style>
+.theme-toggle button { min-height: 34px !important; padding: 4px 12px !important; font-size: 12px !important; }
+</style>
+"""

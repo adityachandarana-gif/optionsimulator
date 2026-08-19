@@ -22,7 +22,7 @@ from app_config import (
 )
 from options_pricing import calculate_option_price, generate_option_chain, get_iv_surface
 from trading_risk import calculate_realistic_margin, compute_position_greeks, consolidate_positions
-from ui_styles import DASHBOARD_CSS
+from ui_styles import DASHBOARD_CSS, get_theme_css
 
 # ============ PAGE CONFIG ============
 st.set_page_config(
@@ -326,6 +326,7 @@ st.markdown(DASHBOARD_CSS, unsafe_allow_html=True)
 # ============ SESSION STATE INIT ============
 # ============ SIMULATION CONSTANTS ============
 initialize_session_state(st.session_state)
+st.markdown(get_theme_css(st.session_state.theme_mode), unsafe_allow_html=True)
 
 # ============ HELPER / CACHED FUNCTIONS ============
 
@@ -992,6 +993,16 @@ def main():
         <p>Developed by Prof. Bhavesh (IMNU) for classroom use only</p>
     </div>
     """, unsafe_allow_html=True)
+
+    theme_col, _ = st.columns([1, 5])
+    with theme_col:
+        next_theme = 'light' if st.session_state.theme_mode == 'dark' else 'dark'
+        theme_label = '☀️ Light theme' if next_theme == 'light' else '🌙 Dark theme'
+        st.markdown('<div class="theme-toggle">', unsafe_allow_html=True)
+        if st.button(theme_label, key="btn_theme_toggle", use_container_width=True):
+            st.session_state.theme_mode = next_theme
+            st.rerun()
+        st.markdown('</div>', unsafe_allow_html=True)
 
     lot_size = st.session_state.lot_size
 
