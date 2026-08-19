@@ -150,6 +150,9 @@ def get_theme_css(theme_mode):
 <style>
 :root { --bg: #f4f7fb; --surface: #ffffff; --surface-raised: #eef3f8; --border: #cbd5e1; --text: #172033; --muted: #526174; --focus: #1d4ed8; }
 .stApp { background: #f4f7fb !important; color: #172033 !important; }
+.fixed-header h1 { color: #f8fafc !important; }
+.fixed-header p { color: #a8c5e2 !important; }
+.fixed-header .environment-badge { color: #bfdbfe !important; background: rgba(30, 58, 95, .72) !important; }
 .card, .card-beige, [data-testid="stMetric"], .pnl-row { background: #ffffff !important; border-color: #cbd5e1 !important; box-shadow: 0 5px 14px rgba(30, 41, 59, .08) !important; }
 .nifty-price, [data-testid="stMetricValue"], [data-testid="stMarkdownContainer"] h1, [data-testid="stMarkdownContainer"] h2, [data-testid="stMarkdownContainer"] h3, .section-title, .pos-instrument, .margin-val, .subsection-title { color: #172033 !important; }
 .nifty-symbol, .pnl-label, .nifty-meta, .pos-meta, .margin-label, label, .stSelectbox label, .stNumberInput label, .stSlider label, [data-testid="stCaptionContainer"], [data-testid="stMarkdownContainer"] { color: #526174 !important; }
