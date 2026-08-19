@@ -1898,8 +1898,14 @@ def main():
 
         # ---------- TAB 5: MARKET NEWS ----------
         with tab_news:
-            st.markdown('<div class="section-title">Finance Intelligence</div>', unsafe_allow_html=True)
-            st.caption("Live AI-curated finance news from the companion Finance Intelligence platform.")
+            c1, c2 = st.columns([3, 1])
+            with c1:
+                st.markdown('<div class="section-title">Finance Intelligence</div>', unsafe_allow_html=True)
+                st.caption("Live AI-curated finance news from the companion Finance Intelligence platform.")
+            with c2:
+                st.link_button("🌐 Open FinPulse Platform", FINANCE_INTEL_URL, use_container_width=True)
+            
+            st.divider()
             
             try:
                 import requests
@@ -1909,23 +1915,27 @@ def main():
                 
                 if "articles" in news_data and news_data["articles"]:
                     cols = st.columns(2)
-                    for i, article in enumerate(news_data["articles"]):
+                    for i, article in enumerate(news_data["articles"][:20]): # Limit to 20 articles
                         col = cols[i % 2]
                         with col:
                             with st.container(border=True):
-                                publisher = article.get('publisher', 'NEWS')
-                                category = article.get('category', 'Markets')
-                                st.caption(f"**{publisher}** • {category}")
+                                publisher = article.get('source', 'NEWS')
+                                # category is not explicitly in the article type, just use Markets
+                                st.caption(f"**{publisher}** • Markets")
                                 st.markdown(f"#### {article.get('title')}")
-                                st.write(article.get('summary', ''))
-                                # Use URL directly, checking if it exists
-                                url = article.get('url', FINANCE_INTEL_URL)
+                                st.write(article.get('brief_summary', ''))
+                                
+                                # Link to the specific article page on FinPulse
+                                article_id = article.get('id')
+                                if article_id:
+                                    url = f"{FINANCE_INTEL_URL.rstrip('/')}/article/{article_id}"
+                                else:
+                                    url = FINANCE_INTEL_URL
                                 st.link_button("Read full article", url)
                 else:
                     st.info("No news articles found today.")
             except Exception as e:
                 st.error("Could not load latest news at this time.")
-                st.link_button("Open Finance Intelligence", FINANCE_INTEL_URL)
 
         # ===== AUTO-PLAY =====
         # Each bar = 5 sim-minutes. 1 real second = 1 sim minute → 5s per bar at 1x.
