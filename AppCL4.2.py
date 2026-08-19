@@ -775,6 +775,18 @@ def load_session_state():
     return True
 
 
+def exit_simulator():
+    """Stop and clear the local simulator session before showing the exit state."""
+    st.session_state.playing = False
+    st.session_state.data_loaded = False
+    st.session_state.app_exited = True
+    try:
+        if os.path.exists(PERSIST_PATH):
+            os.remove(PERSIST_PATH)
+    except Exception:
+        pass
+
+
 HOLD_DAYS = 22
 
 def get_trading_day_offsets(n_days, anchor_date=None):
@@ -983,6 +995,35 @@ def main():
     if not st.session_state.data_loaded:
         load_session_state()
 
+    if st.session_state.app_exited:
+        st.markdown('<div class="card">', unsafe_allow_html=True)
+        st.markdown("### Simulator closed")
+        st.caption("The local simulator session has been closed. Reopen it when you are ready to explore again.")
+        if st.button("Reopen Simulator", type="primary", use_container_width=True, key="btn_reopen_simulator"):
+            st.session_state.app_exited = False
+            st.session_state.welcome_acknowledged = False
+            st.rerun()
+        st.markdown('</div>', unsafe_allow_html=True)
+        return
+
+    if not st.session_state.data_loaded and not st.session_state.welcome_acknowledged:
+        @st.dialog("Welcome to the Option Market Simulator")
+        def show_welcome_dialog():
+            st.markdown(
+                "Explore simulated option trading on a generated NIFTY 50 price path. "
+                "Review calls, puts, Greeks, moneyness, P&L, margin, charts, and market news."
+            )
+            st.caption(
+                "Educational use only: prices, orders, fills, and risk figures are simulated "
+                "and are not investment advice or live market data."
+            )
+            if st.button("Okay, continue", type="primary", use_container_width=True, key="btn_welcome_ok"):
+                st.session_state.welcome_acknowledged = True
+                st.rerun()
+
+        show_welcome_dialog()
+        return
+
     # Fixed Header
     st.markdown("""
     <div class="fixed-header">
@@ -1036,7 +1077,17 @@ def main():
             uploaded = st.file_uploader("Or upload data file (optional)", type=["txt", "csv"], key="setup_upload")
         open_price_input = st.number_input("Opening price", min_value=1.0, value=DEFAULT_OPEN_PRICE, step=50.0, key="setup_open")
 
-        if st.button("Start Session", type="primary", use_container_width=True, key="btn_start_session"):
+        start_col, exit_col = st.columns([3, 1])
+        with start_col:
+            start_session = st.button("Start Session", type="primary", use_container_width=True, key="btn_start_session")
+        with exit_col:
+            exit_session = st.button("Exit", use_container_width=True, key="btn_exit_setup")
+
+        if exit_session:
+            exit_simulator()
+            st.rerun()
+
+        if start_session:
             df = None
             source = "garch"
             if uploaded is not None:
@@ -1326,6 +1377,9 @@ def main():
                 pass
             st.rerun()
         st.markdown('</div>', unsafe_allow_html=True)
+        if st.button("Exit Simulator", use_container_width=True, key="btn_exit_active"):
+            exit_simulator()
+            st.rerun()
 
     # ==================== RIGHT PANEL ====================
     with col_right:

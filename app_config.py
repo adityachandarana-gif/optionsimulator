@@ -33,6 +33,7 @@ def initialize_session_state(session_state):
         'chain_df': None, 'starting_capital': 10000000.0,
         'peak_margin_used': 0.0, 'session_start_wall': None,
         'data_source_choice': None, 'day_close_map': {}, 'theme_mode': 'dark',
+        'welcome_acknowledged': False, 'app_exited': False,
     }
     for key, value in defaults.items():
         if key not in session_state:
