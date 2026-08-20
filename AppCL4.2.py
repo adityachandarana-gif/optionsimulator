@@ -1031,7 +1031,7 @@ def main():
             <h1 style="color:#f8fafc !important;">Option Market Simulator</h1>
             <span class="environment-badge">SIMULATED MARKET</span>
         </div>
-        <p style="color:#a8c5e2 !important;">Developed by Prof. Bhavesh (IMNU) for classroom use only</p>
+        <p style="color:#a8c5e2 !important;">Developed by Group 2 for classroom use only</p>
     </div>
     """, unsafe_allow_html=True)
 
