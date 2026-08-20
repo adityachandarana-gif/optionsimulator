@@ -1391,7 +1391,7 @@ def main():
         with tab_place:
             if st.session_state.trading_locked:
                 st.warning("Session finished — trading is locked. Generate/download report or Reset to continue.")
-            st.markdown('<div class="section-title" style="color:#1a1a1a; margin-bottom:6px;">Place Order</div>', unsafe_allow_html=True)
+            st.markdown('<div class="section-title" style="margin-bottom:6px;">Place Order</div>', unsafe_allow_html=True)
 
             # --- Strategy Builder ---
             STRATEGY_LIST = [
@@ -1440,8 +1440,10 @@ def main():
                     row = chain_df[chain_df['Strike'] == strike]
                     ltp = float(row.iloc[0]['CE Price'] if otype == 'CE' else row.iloc[0]['PE Price']) if len(row) else 0.0
                     st.markdown(
-                        f"<div style='padding-top:4px;'><div style='font-size:11px;color:#666;font-weight:600;'>LTP</div>"
-                        f"<div style='font-size:18px;font-weight:700;color:#1a1a1a;'>₹{ltp:.2f}</div></div>",
+                        f"<div style='padding-top:4px;'>"
+                        f"<div style='font-size:11px;color:#94a3b8;font-weight:600;letter-spacing:0.5px;'>LTP</div>"
+                        f"<div style='font-size:20px;font-weight:800;color:#facc15;font-family:monospace;'>₹{ltp:.2f}</div>"
+                        f"</div>",
                         unsafe_allow_html=True
                     )
                 limit_price = st.number_input("Limit Price", min_value=0.05, value=float(round(ltp, 2)), step=0.05, key="limit_px") if order_type == "LIMIT" else None
@@ -1475,8 +1477,8 @@ def main():
                     net = sum(s * p for s, p in legs_list)
                     colour = '#e74c3c' if net >= 0 else '#00a86b'
                     label = f"Net {'Debit' if net >= 0 else 'Credit'}"
-                    return f"<div style='padding-top:4px;'><div style='font-size:10px;color:#666;'>{label}</div>" \
-                           f"<div style='font-size:14px;font-weight:700;color:{colour};'>₹{abs(net):.2f}</div></div>"
+                    return f"<div style='padding-top:4px;'><div style='font-size:10px;color:#94a3b8;font-weight:600;letter-spacing:0.4px;'>{label}</div>" \
+                           f"<div style='font-size:16px;font-weight:800;color:{colour};font-family:monospace;'>₹{abs(net):.2f}</div></div>"
 
                 # ── strategy descriptions ───────────────────────────────────
                 STRATEGY_INFO = {
@@ -1763,7 +1765,7 @@ def main():
                         st.markdown(
                             f"**{item['side']}** {item['type']} {item['strike']} &nbsp; "
                             f"{item['lots']} lot &nbsp; ₹{item['price']:.2f} &nbsp; "
-                            f"<span style='color:#666'>{item['order_type']}</span>",
+                            f"<span style='color:#60a5fa;font-weight:700;'>{item['order_type']}</span>",
                             unsafe_allow_html=True
                         )
                     with cols[1]:
@@ -1777,7 +1779,7 @@ def main():
                 )
                 extra = max(0, margin_req - st.session_state.starting_capital)
                 st.markdown(f"""
-                <div class="margin-box">
+                <div class="margin-box" style="background:rgba(14,18,35,0.7);border:1px solid #334155;border-radius:10px;padding:12px;margin:10px 0;">
                     <div class="margin-grid">
                         <div><div class="margin-label">Margin Required</div><div class="margin-val">₹{margin_req:,.0f}</div></div>
                         <div><div class="margin-label">Extra Needed</div><div class="margin-val">₹{extra:,.0f}</div></div>
@@ -1941,7 +1943,7 @@ def main():
                         st.markdown(
                             f"**{item['side']}** {item['type']} {item['strike']} &nbsp; "
                             f"x{item['lots']} @ ₹{item['price']:.2f} &nbsp; "
-                            f"<span style='color:#666'>LIMIT</span> &nbsp; "
+                            f"<span style='color:#60a5fa;font-weight:700;'>LIMIT</span> &nbsp; "
                             f"<span style='color:#888;font-size:12px'>LTP ₹{item.get('ltp', 0):.2f}</span>",
                             unsafe_allow_html=True
                         )

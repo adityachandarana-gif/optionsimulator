@@ -139,6 +139,71 @@ div[style*="font-size:18px"][style*="font-weight:700"] { color: #f8fafc !importa
 @media (prefers-reduced-motion: reduce) {
   *, *::before, *::after { transition: none !important; animation: none !important; scroll-behavior: auto !important; }
 }
+
+/* ── section titles ── */
+.section-title {
+  font-size: 12px !important; font-weight: 700 !important;
+  letter-spacing: 0.5px !important; text-transform: uppercase !important;
+  color: #64748b !important; margin: 14px 0 6px !important;
+  border-bottom: 1px solid #1e293b; padding-bottom: 5px;
+}
+
+/* ── tab strip ── */
+.stTabs [data-baseweb="tab-list"] {
+  background: #0d1526 !important; border: 1px solid #1e3a5f !important;
+  border-radius: 10px !important; padding: 5px !important; gap: 4px !important;
+}
+.stTabs [data-baseweb="tab"] {
+  border-radius: 8px !important; font-size: 13px !important;
+  font-weight: 700 !important; padding: 9px 16px !important;
+  color: #475569 !important;
+}
+.stTabs [aria-selected="true"] {
+  background: linear-gradient(135deg,#1d4ed8,#2563eb) !important;
+  color: #ffffff !important;
+  box-shadow: 0 3px 10px rgba(37,99,235,.45) !important;
+}
+.stTabs [data-baseweb="tab"]:hover:not([aria-selected="true"]) {
+  background: #182943 !important; color: #cbd5e1 !important;
+}
+
+/* ── info / strategy hint box ── */
+[data-testid="stInfo"] {
+  background: rgba(30,58,95,0.45) !important;
+  border: 1px solid #1d4ed8 !important;
+  border-left: 4px solid #3b82f6 !important;
+  border-radius: 8px !important;
+}
+[data-testid="stInfo"] p, [data-testid="stInfo"] { color: #bfdbfe !important; }
+
+/* ── metric cards ── */
+[data-testid="stMetric"] {
+  background: linear-gradient(145deg,#111a30,#0d1526) !important;
+  border: 1px solid #1e3a5f !important;
+  border-radius: 10px !important; padding: 14px 16px !important;
+}
+[data-testid="stMetricLabel"] { color: #64748b !important; font-size: 11px !important; text-transform: uppercase; letter-spacing: 0.4px; }
+[data-testid="stMetricValue"] { color: #f1f5f9 !important; font-family: 'Fira Code', monospace !important; }
+
+/* ── margin box ── */
+.margin-box {
+  background: rgba(14,18,35,0.8) !important;
+  border: 1px solid #1e3a5f !important;
+  border-radius: 10px !important; padding: 12px !important; margin: 8px 0 !important;
+}
+.margin-label { color: #64748b !important; font-size: 10px !important; text-transform: uppercase; letter-spacing: 0.4px; }
+.margin-val   { color: #f1f5f9 !important; font-size: 15px !important; font-weight: 700 !important; font-family: 'Fira Code', monospace; }
+
+/* ── chart container border ── */
+[data-testid="stPlotlyChart"] {
+  border: 1px solid #1e3a5f; border-radius: 10px; overflow: hidden;
+}
+
+/* ── primary Execute button ── */
+div[data-testid="stButton"] > button[kind="primary"] {
+  background: linear-gradient(135deg,#1d4ed8,#2563eb) !important;
+  box-shadow: 0 4px 12px rgba(37,99,235,0.4) !important;
+}
 </style>
 """
 
