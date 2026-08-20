@@ -1437,45 +1437,128 @@ def main():
                         'ltp': ltp
                     }]
             else:
-                with c1:
-                    st.markdown("<div style='padding-top:30px; font-weight:bold;'>Multi-Leg</div>", unsafe_allow_html=True)
-                with c2:
-                    st.empty()
-                with c3:
-                    strike = st.selectbox("Base Strike", strikes, index=default_idx, key="ord_strike_base")
-                with c5:
-                    order_type = st.selectbox("Order", ["MARKET"], key="ord_order", disabled=True)
-                with c6:
-                    st.markdown("<div style='padding-top:30px; font-weight:bold; color:#666;'>Auto-Priced</div>", unsafe_allow_html=True)
-                
-                def _build_order_items():
-                    items = []
-                    qty = lots * lot_size
-                    legs = []
-                    if strategy == 'Straddle':
-                        legs = [('Buy', 'CE', strike), ('Buy', 'PE', strike)]
-                    elif strategy == 'Strangle':
-                        legs = [('Buy', 'CE', strike + 100), ('Buy', 'PE', strike - 100)]
-                    elif strategy == 'Bull Call Spread':
-                        legs = [('Buy', 'CE', strike), ('Sell', 'CE', strike + 100)]
-                    elif strategy == 'Bear Put Spread':
-                        legs = [('Buy', 'PE', strike), ('Sell', 'PE', strike - 100)]
-                    
-                    for l_side, l_type, l_strike in legs:
-                        row = chain_df[chain_df['Strike'] == l_strike]
-                        if len(row):
-                            ltp_val = float(row.iloc[0]['CE Price'] if l_type == 'CE' else row.iloc[0]['PE Price'])
-                            items.append({
-                                'side': l_side,
-                                'type': l_type,
-                                'strike': l_strike,
-                                'lots': lots,
-                                'quantity': qty,
-                                'price': ltp_val,
-                                'order_type': 'MARKET',
-                                'ltp': ltp_val
-                            })
-                    return items
+                # Strategy descriptions for learning
+                strategy_info = {
+                    'Straddle':        ('📘 Buy ATM CE + Buy ATM PE. Profits from big moves in either direction. Max loss = total premium paid.', 1),
+                    'Strangle':        ('📘 Buy OTM CE + Buy OTM PE. Cheaper than straddle; needs a bigger move to profit.', 1),
+                    'Bull Call Spread': ('📘 Buy lower-strike CE + Sell higher-strike CE. Bullish view. Limits both max profit and max loss.', 2),
+                    'Bear Put Spread':  ('📘 Buy higher-strike PE + Sell lower-strike PE. Bearish view. Limits both max profit and max loss.', 2),
+                }
+                info_text, n_strikes = strategy_info.get(strategy, ('', 1))
+                st.info(info_text)
+
+                # Determine which legs need a strike selector
+                if strategy in ('Straddle',):
+                    # Single strike — ATM
+                    s1col, _, s3col, _, s5col, s6col = st.columns([1.0, 0.9, 1.2, 0.8, 1.1, 1.0])
+                    with s3col:
+                        strike_atm = st.selectbox("ATM Strike", strikes, index=default_idx, key="ord_strike_atm")
+                    with s5col:
+                        order_type = "MARKET"
+                        st.caption("Market Order")
+                    with s6col:
+                        st.markdown("<div style='padding-top:8px; font-size:11px; color:#666;'>Auto-Priced</div>", unsafe_allow_html=True)
+
+                    def _build_order_items():
+                        qty = lots * lot_size
+                        legs = [('Buy', 'CE', strike_atm), ('Buy', 'PE', strike_atm)]
+                        items = []
+                        for l_side, l_type, l_strike in legs:
+                            row = chain_df[chain_df['Strike'] == l_strike]
+                            if len(row):
+                                ltp_val = float(row.iloc[0]['CE Price'] if l_type == 'CE' else row.iloc[0]['PE Price'])
+                                items.append({'side': l_side, 'type': l_type, 'strike': l_strike, 'lots': lots, 'quantity': qty, 'price': ltp_val, 'order_type': 'MARKET', 'ltp': ltp_val})
+                        return items
+
+                elif strategy == 'Strangle':
+                    s1col, s2col, s3col, _, s5col, s6col = st.columns([1.0, 0.9, 1.2, 0.8, 1.1, 1.0])
+                    with s1col:
+                        otm_ce_strike = st.selectbox("OTM CE Strike", [s for s in strikes if s >= atm_strike], index=0, key="ord_strike_ce")
+                    with s2col:
+                        otm_pe_strike = st.selectbox("OTM PE Strike", [s for s in strikes if s <= atm_strike], index=len([s for s in strikes if s <= atm_strike])-1, key="ord_strike_pe")
+                    with s3col:
+                        st.markdown(f"<div style='padding-top:28px; font-size:11px; color:#555;'>CE: {otm_ce_strike} | PE: {otm_pe_strike}</div>", unsafe_allow_html=True)
+                    with s5col:
+                        order_type = "MARKET"
+                        st.caption("Market Order")
+                    with s6col:
+                        st.markdown("<div style='padding-top:8px; font-size:11px; color:#666;'>Auto-Priced</div>", unsafe_allow_html=True)
+
+                    def _build_order_items():
+                        qty = lots * lot_size
+                        legs = [('Buy', 'CE', otm_ce_strike), ('Buy', 'PE', otm_pe_strike)]
+                        items = []
+                        for l_side, l_type, l_strike in legs:
+                            row = chain_df[chain_df['Strike'] == l_strike]
+                            if len(row):
+                                ltp_val = float(row.iloc[0]['CE Price'] if l_type == 'CE' else row.iloc[0]['PE Price'])
+                                items.append({'side': l_side, 'type': l_type, 'strike': l_strike, 'lots': lots, 'quantity': qty, 'price': ltp_val, 'order_type': 'MARKET', 'ltp': ltp_val})
+                        return items
+
+                elif strategy == 'Bull Call Spread':
+                    s1col, s2col, _, _, s5col, s6col = st.columns([1.0, 0.9, 1.2, 0.8, 1.1, 1.0])
+                    with s1col:
+                        buy_strike = st.selectbox("Buy CE (lower)", strikes, index=default_idx, key="ord_strike_buy")
+                    # Only allow sell strike higher than buy strike
+                    sell_strikes = [s for s in strikes if s > buy_strike]
+                    sell_default = 0
+                    with s2col:
+                        sell_strike = st.selectbox("Sell CE (higher)", sell_strikes if sell_strikes else strikes, index=sell_default, key="ord_strike_sell")
+                    with s5col:
+                        order_type = "MARKET"
+                        st.caption("Market Order")
+                    with s6col:
+                        # Show net debit
+                        buy_row = chain_df[chain_df['Strike'] == buy_strike]
+                        sell_row = chain_df[chain_df['Strike'] == sell_strike] if sell_strikes else pd.DataFrame()
+                        buy_px = float(buy_row.iloc[0]['CE Price']) if len(buy_row) else 0
+                        sell_px = float(sell_row.iloc[0]['CE Price']) if len(sell_row) else 0
+                        net = buy_px - sell_px
+                        st.markdown(f"<div style='padding-top:4px;'><div style='font-size:10px;color:#666;'>Net Debit/lot</div><div style='font-size:15px;font-weight:700;color:#e74c3c;'>₹{net:.2f}</div></div>", unsafe_allow_html=True)
+
+                    def _build_order_items():
+                        qty = lots * lot_size
+                        legs = [('Buy', 'CE', buy_strike), ('Sell', 'CE', sell_strike)]
+                        items = []
+                        for l_side, l_type, l_strike in legs:
+                            row = chain_df[chain_df['Strike'] == l_strike]
+                            if len(row):
+                                ltp_val = float(row.iloc[0]['CE Price'])
+                                items.append({'side': l_side, 'type': l_type, 'strike': l_strike, 'lots': lots, 'quantity': qty, 'price': ltp_val, 'order_type': 'MARKET', 'ltp': ltp_val})
+                        return items
+
+                elif strategy == 'Bear Put Spread':
+                    s1col, s2col, _, _, s5col, s6col = st.columns([1.0, 0.9, 1.2, 0.8, 1.1, 1.0])
+                    with s1col:
+                        buy_strike = st.selectbox("Buy PE (higher)", strikes, index=default_idx, key="ord_strike_buy")
+                    sell_strikes = [s for s in strikes if s < buy_strike]
+                    with s2col:
+                        sell_strike = st.selectbox("Sell PE (lower)", sell_strikes if sell_strikes else strikes, index=len(sell_strikes)-1 if sell_strikes else 0, key="ord_strike_sell")
+                    with s5col:
+                        order_type = "MARKET"
+                        st.caption("Market Order")
+                    with s6col:
+                        buy_row = chain_df[chain_df['Strike'] == buy_strike]
+                        sell_row = chain_df[chain_df['Strike'] == sell_strike] if sell_strikes else pd.DataFrame()
+                        buy_px = float(buy_row.iloc[0]['PE Price']) if len(buy_row) else 0
+                        sell_px = float(sell_row.iloc[0]['PE Price']) if len(sell_row) else 0
+                        net = buy_px - sell_px
+                        st.markdown(f"<div style='padding-top:4px;'><div style='font-size:10px;color:#666;'>Net Debit/lot</div><div style='font-size:15px;font-weight:700;color:#e74c3c;'>₹{net:.2f}</div></div>", unsafe_allow_html=True)
+
+                    def _build_order_items():
+                        qty = lots * lot_size
+                        legs = [('Buy', 'PE', buy_strike), ('Sell', 'PE', sell_strike)]
+                        items = []
+                        for l_side, l_type, l_strike in legs:
+                            row = chain_df[chain_df['Strike'] == l_strike]
+                            if len(row):
+                                ltp_val = float(row.iloc[0]['PE Price'])
+                                items.append({'side': l_side, 'type': l_type, 'strike': l_strike, 'lots': lots, 'quantity': qty, 'price': ltp_val, 'order_type': 'MARKET', 'ltp': ltp_val})
+                        return items
+
+                else:
+                    def _build_order_items():
+                        return []
 
             def _can_afford(extra_items):
                 trial = list(st.session_state.positions) + list(extra_items)
@@ -1634,46 +1717,118 @@ def main():
                 st.caption("Basket is empty — use for multi-leg / basket orders")
             
             # --- Interactive Payoff Diagram ---
-            st.markdown('<div class="section-title" style="margin-top:16px;">Payoff Diagram (Positions + Basket)</div>', unsafe_allow_html=True)
+            st.markdown('<div class="section-title" style="margin-top:16px;">📊 Payoff Diagram (Positions + Basket)</div>', unsafe_allow_html=True)
             combo_items = list(st.session_state.positions) + list(st.session_state.basket)
             if combo_items:
-                spot_range = np.linspace(current_price * 0.90, current_price * 1.10, 150)
+                spot_range = np.linspace(current_price * 0.88, current_price * 1.12, 300)
                 payoffs = np.zeros_like(spot_range)
                 total_cost = 0.0
-                
+
                 for item in combo_items:
                     k = item['strike']
                     typ = item['type']
                     sign = 1 if item['side'].title() == 'Buy' else -1
                     qty = item.get('quantity', 0)
-                    # Note: positions have entry_price, basket items have price
                     px = item.get('price', item.get('entry_price', 0))
-                    
                     total_cost += sign * qty * px
-                    
                     if typ == 'CE':
                         payoffs += sign * qty * np.maximum(spot_range - k, 0)
                     else:
                         payoffs += sign * qty * np.maximum(k - spot_range, 0)
-                
                 payoffs -= total_cost
-                
+
+                # Split into profit and loss zones for coloring
+                profit_y = np.where(payoffs >= 0, payoffs, 0)
+                loss_y   = np.where(payoffs <= 0, payoffs, 0)
+
+                # Breakeven crossings
+                sign_changes = np.where(np.diff(np.sign(payoffs)))[0]
+                breakevens = []
+                for idx in sign_changes:
+                    if payoffs[idx+1] != payoffs[idx]:
+                        be = spot_range[idx] - payoffs[idx] * (spot_range[idx+1] - spot_range[idx]) / (payoffs[idx+1] - payoffs[idx])
+                        breakevens.append(be)
+
+                max_profit = float(np.max(payoffs))
+                max_loss   = float(np.min(payoffs))
+
                 fig = go.Figure()
-                fig.add_trace(go.Scatter(x=spot_range, y=payoffs, mode='lines', name='Payoff at Expiry',
-                                         line=dict(color='#387ed1', width=3), fill='tozeroy', 
-                                         fillcolor='rgba(56, 126, 209, 0.1)'))
-                fig.add_vline(x=current_price, line_dash="dash", line_color="#e74c3c", annotation_text="Current Spot", annotation_position="top left")
-                fig.add_hline(y=0, line_color="black", line_width=1)
-                
+
+                # Profit zone (green fill)
+                fig.add_trace(go.Scatter(
+                    x=spot_range, y=profit_y, mode='none',
+                    fill='tozeroy', fillcolor='rgba(0,168,107,0.18)',
+                    name='Profit Zone', showlegend=True
+                ))
+                # Loss zone (red fill)
+                fig.add_trace(go.Scatter(
+                    x=spot_range, y=loss_y, mode='none',
+                    fill='tozeroy', fillcolor='rgba(231,76,60,0.18)',
+                    name='Loss Zone', showlegend=True
+                ))
+                # Payoff line
+                fig.add_trace(go.Scatter(
+                    x=spot_range, y=payoffs, mode='lines',
+                    name='Payoff at Expiry',
+                    line=dict(color='#1a1a2e', width=2.5)
+                ))
+
+                # Breakeven vertical lines
+                for i, be in enumerate(breakevens):
+                    fig.add_vline(
+                        x=be, line_dash="dot", line_color="#f39c12", line_width=1.5,
+                        annotation_text=f"BE ₹{be:,.0f}",
+                        annotation_font=dict(color="#f39c12", size=11),
+                        annotation_position="top right" if i % 2 == 0 else "bottom right"
+                    )
+
+                # Current spot
+                fig.add_vline(
+                    x=current_price, line_dash="dash", line_color="#e74c3c", line_width=2,
+                    annotation_text=f"Spot ₹{current_price:,.0f}",
+                    annotation_font=dict(color="#e74c3c", size=11, family="Arial Black"),
+                    annotation_position="top left"
+                )
+
+                # Zero line
+                fig.add_hline(y=0, line_color="#555", line_width=1)
+
+                # Max profit / max loss annotations
+                if not np.isinf(max_profit) and max_profit > 0:
+                    mp_idx = int(np.argmax(payoffs))
+                    fig.add_annotation(x=spot_range[mp_idx], y=max_profit,
+                        text=f"Max Profit ₹{max_profit:,.0f}", showarrow=True,
+                        arrowhead=2, arrowcolor="#00a86b", font=dict(color="#00a86b", size=11),
+                        bgcolor="rgba(255,255,255,0.85)", bordercolor="#00a86b", borderwidth=1
+                    )
+                if not np.isinf(max_loss) and max_loss < 0:
+                    ml_idx = int(np.argmin(payoffs))
+                    fig.add_annotation(x=spot_range[ml_idx], y=max_loss,
+                        text=f"Max Loss ₹{max_loss:,.0f}", showarrow=True,
+                        arrowhead=2, arrowcolor="#e74c3c", font=dict(color="#e74c3c", size=11),
+                        bgcolor="rgba(255,255,255,0.85)", bordercolor="#e74c3c", borderwidth=1
+                    )
+
                 fig.update_layout(
-                    xaxis_title="Underlying Price at Expiry",
-                    yaxis_title="Net Profit / Loss (₹)",
-                    height=300,
-                    margin=dict(l=20, r=20, t=30, b=20),
-                    plot_bgcolor="#ffffff",
-                    paper_bgcolor="#ffffff"
+                    xaxis_title="NIFTY Price at Expiry (₹)",
+                    yaxis_title="Net P&L (₹)",
+                    height=340,
+                    margin=dict(l=10, r=10, t=10, b=40),
+                    plot_bgcolor="#fafafa",
+                    paper_bgcolor="#ffffff",
+                    legend=dict(orientation="h", yanchor="bottom", y=1.01, xanchor="left", x=0),
+                    xaxis=dict(tickformat=",.0f", gridcolor="#ebebeb"),
+                    yaxis=dict(tickformat=",.0f", gridcolor="#ebebeb", zeroline=False),
+                    hovermode="x unified"
                 )
                 st.plotly_chart(fig, use_container_width=True)
+
+                # Summary stats row
+                be_text = "  |  ".join([f"₹{b:,.0f}" for b in breakevens]) if breakevens else "None"
+                kc1, kc2, kc3 = st.columns(3)
+                kc1.metric("Max Profit", f"₹{max_profit:,.0f}" if not np.isinf(max_profit) else "Unlimited")
+                kc2.metric("Max Loss",   f"₹{max_loss:,.0f}"   if not np.isinf(max_loss)   else "Unlimited")
+                kc3.metric("Breakeven(s)", be_text)
             else:
                 st.info("Add items to your basket or open positions to see the payoff diagram.")
 
@@ -1988,42 +2143,13 @@ def main():
         with tab_news:
             c1, c2 = st.columns([3, 1])
             with c1:
-                st.markdown('<div class="section-title">Finance Intelligence</div>', unsafe_allow_html=True)
-                st.caption("Live AI-curated finance news from the companion Finance Intelligence platform.")
+                st.markdown('<div class="section-title">📰 Market News & Finance Intelligence</div>', unsafe_allow_html=True)
+                st.caption("Live finance news — embedded directly from FinPulse. Opens full platform in a new tab.")
             with c2:
                 st.link_button("🌐 Open FinPulse Platform", FINANCE_INTEL_URL, use_container_width=True)
-            
-            st.divider()
-            
-            try:
-                import requests
-                api_url = "https://finance-intel-ruby.vercel.app/api/articles"
-                response = requests.get(api_url, timeout=5)
-                news_data = response.json()
-                
-                if "articles" in news_data and news_data["articles"]:
-                    cols = st.columns(2)
-                    for i, article in enumerate(news_data["articles"][:20]): # Limit to 20 articles
-                        col = cols[i % 2]
-                        with col:
-                            with st.container(border=True):
-                                publisher = article.get('source', 'NEWS')
-                                # category is not explicitly in the article type, just use Markets
-                                st.caption(f"**{publisher}** • Markets")
-                                st.markdown(f"#### {article.get('title')}")
-                                st.write(article.get('brief_summary', ''))
-                                
-                                # Link to the specific article page on FinPulse
-                                article_id = article.get('id')
-                                if article_id:
-                                    url = f"{FINANCE_INTEL_URL.rstrip('/')}/article/{article_id}"
-                                else:
-                                    url = FINANCE_INTEL_URL
-                                st.link_button("Read full article", url)
-                else:
-                    st.info("No news articles found today.")
-            except Exception as e:
-                st.error("Could not load latest news at this time.")
+
+            # Iframe embed — more reliable than API polling
+            components.iframe(FINANCE_INTEL_URL, height=600, scrolling=True)
 
         # ===== AUTO-PLAY =====
         # Each bar = 5 sim-minutes. 1 real second = 1 sim minute → 5s per bar at 1x.
