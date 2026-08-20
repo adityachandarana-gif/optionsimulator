@@ -1393,46 +1393,89 @@ def main():
                 st.warning("Session finished — trading is locked. Generate/download report or Reset to continue.")
             st.markdown('<div class="section-title" style="color:#1a1a1a; margin-bottom:6px;">Place Order</div>', unsafe_allow_html=True)
 
+            # --- Strategy Builder ---
+            strategy = st.selectbox("Strategy Template", ["Single Option", "Straddle", "Strangle", "Bull Call Spread", "Bear Put Spread"], key="strat_template")
+            
             # Clean tight order-entry row
             c1, c2, c3, c4, c5, c6 = st.columns([1.0, 0.9, 1.2, 0.8, 1.1, 1.0])
-            with c1:
-                side = st.selectbox("Side", ["BUY", "SELL"], key="ord_side")
-            with c2:
-                otype = st.selectbox("Type", ["CE", "PE"], key="ord_type")
-            with c3:
-                strikes = chain_df['Strike'].tolist()
-                default_idx = strikes.index(atm_strike) if atm_strike in strikes else 0
-                strike = st.selectbox("Strike", strikes, index=default_idx, key="ord_strike")
+            strikes = chain_df['Strike'].tolist()
+            default_idx = strikes.index(atm_strike) if atm_strike in strikes else 0
+            
             with c4:
                 lots = st.number_input("Lots", min_value=1, value=1, step=1, key="ord_lots")
-            with c5:
-                order_type = st.selectbox("Order", ["MARKET", "LIMIT"], key="ord_order")
-            with c6:
-                row = chain_df[chain_df['Strike'] == strike]
-                ltp = float(row.iloc[0]['CE Price'] if otype == 'CE' else row.iloc[0]['PE Price']) if len(row) else 0.0
-                st.markdown(
-                    f"<div style='padding-top:4px;'><div style='font-size:11px;color:#666;font-weight:600;'>LTP</div>"
-                    f"<div style='font-size:18px;font-weight:700;color:#1a1a1a;'>₹{ltp:.2f}</div></div>",
-                    unsafe_allow_html=True
-                )
-
-            limit_price = None
-            if order_type == "LIMIT":
-                limit_price = st.number_input("Limit Price", min_value=0.05, value=float(round(ltp, 2)), step=0.05, key="limit_px")
-
-            def _build_order_item():
-                qty = lots * lot_size
-                px = limit_price if order_type == "LIMIT" else ltp
-                return {
-                    'side': side.title(),
-                    'type': otype,
-                    'strike': strike,
-                    'lots': lots,
-                    'quantity': qty,
-                    'price': px,
-                    'order_type': order_type,
-                    'ltp': ltp
-                }
+            
+            if strategy == "Single Option":
+                with c1:
+                    side = st.selectbox("Side", ["BUY", "SELL"], key="ord_side")
+                with c2:
+                    otype = st.selectbox("Type", ["CE", "PE"], key="ord_type")
+                with c3:
+                    strike = st.selectbox("Strike", strikes, index=default_idx, key="ord_strike")
+                with c5:
+                    order_type = st.selectbox("Order", ["MARKET", "LIMIT"], key="ord_order")
+                with c6:
+                    row = chain_df[chain_df['Strike'] == strike]
+                    ltp = float(row.iloc[0]['CE Price'] if otype == 'CE' else row.iloc[0]['PE Price']) if len(row) else 0.0
+                    st.markdown(
+                        f"<div style='padding-top:4px;'><div style='font-size:11px;color:#666;font-weight:600;'>LTP</div>"
+                        f"<div style='font-size:18px;font-weight:700;color:#1a1a1a;'>₹{ltp:.2f}</div></div>",
+                        unsafe_allow_html=True
+                    )
+                limit_price = st.number_input("Limit Price", min_value=0.05, value=float(round(ltp, 2)), step=0.05, key="limit_px") if order_type == "LIMIT" else None
+                
+                def _build_order_items():
+                    qty = lots * lot_size
+                    px = limit_price if order_type == "LIMIT" else ltp
+                    return [{
+                        'side': side.title(),
+                        'type': otype,
+                        'strike': strike,
+                        'lots': lots,
+                        'quantity': qty,
+                        'price': px,
+                        'order_type': order_type,
+                        'ltp': ltp
+                    }]
+            else:
+                with c1:
+                    st.markdown("<div style='padding-top:30px; font-weight:bold;'>Multi-Leg</div>", unsafe_allow_html=True)
+                with c2:
+                    st.empty()
+                with c3:
+                    strike = st.selectbox("Base Strike", strikes, index=default_idx, key="ord_strike_base")
+                with c5:
+                    order_type = st.selectbox("Order", ["MARKET"], key="ord_order", disabled=True)
+                with c6:
+                    st.markdown("<div style='padding-top:30px; font-weight:bold; color:#666;'>Auto-Priced</div>", unsafe_allow_html=True)
+                
+                def _build_order_items():
+                    items = []
+                    qty = lots * lot_size
+                    legs = []
+                    if strategy == 'Straddle':
+                        legs = [('Buy', 'CE', strike), ('Buy', 'PE', strike)]
+                    elif strategy == 'Strangle':
+                        legs = [('Buy', 'CE', strike + 100), ('Buy', 'PE', strike - 100)]
+                    elif strategy == 'Bull Call Spread':
+                        legs = [('Buy', 'CE', strike), ('Sell', 'CE', strike + 100)]
+                    elif strategy == 'Bear Put Spread':
+                        legs = [('Buy', 'PE', strike), ('Sell', 'PE', strike - 100)]
+                    
+                    for l_side, l_type, l_strike in legs:
+                        row = chain_df[chain_df['Strike'] == l_strike]
+                        if len(row):
+                            ltp_val = float(row.iloc[0]['CE Price'] if l_type == 'CE' else row.iloc[0]['PE Price'])
+                            items.append({
+                                'side': l_side,
+                                'type': l_type,
+                                'strike': l_strike,
+                                'lots': lots,
+                                'quantity': qty,
+                                'price': ltp_val,
+                                'order_type': 'MARKET',
+                                'ltp': ltp_val
+                            })
+                    return items
 
             def _can_afford(extra_items):
                 trial = list(st.session_state.positions) + list(extra_items)
@@ -1503,14 +1546,15 @@ def main():
             with btn1:
                 if st.button("Add to Basket", key="btn_add_basket", type="secondary", use_container_width=True,
                              disabled=st.session_state.trading_locked):
-                    st.session_state.basket.append(_build_order_item())
-                    st.toast(f"Added {side} {strike} {otype} x{lots} to basket", icon="✅")
+                    items = _build_order_items()
+                    st.session_state.basket.extend(items)
+                    st.toast(f"Added {len(items)} leg(s) to basket", icon="✅")
                     st.rerun()
             with btn2:
                 if st.button("Execute Now", key="btn_exec_now", type="primary", use_container_width=True,
                              disabled=st.session_state.trading_locked):
-                    item = _build_order_item()
-                    n = _execute_items([item])
+                    items = _build_order_items()
+                    n = _execute_items(items)
                     if n:
                         st.toast(f"✅ Order executed", icon="🎉")
                         components.html("""
@@ -1588,6 +1632,50 @@ def main():
                         st.rerun()
             else:
                 st.caption("Basket is empty — use for multi-leg / basket orders")
+            
+            # --- Interactive Payoff Diagram ---
+            st.markdown('<div class="section-title" style="margin-top:16px;">Payoff Diagram (Positions + Basket)</div>', unsafe_allow_html=True)
+            combo_items = list(st.session_state.positions) + list(st.session_state.basket)
+            if combo_items:
+                spot_range = np.linspace(current_price * 0.90, current_price * 1.10, 150)
+                payoffs = np.zeros_like(spot_range)
+                total_cost = 0.0
+                
+                for item in combo_items:
+                    k = item['strike']
+                    typ = item['type']
+                    sign = 1 if item['side'].title() == 'Buy' else -1
+                    qty = item.get('quantity', 0)
+                    # Note: positions have entry_price, basket items have price
+                    px = item.get('price', item.get('entry_price', 0))
+                    
+                    total_cost += sign * qty * px
+                    
+                    if typ == 'CE':
+                        payoffs += sign * qty * np.maximum(spot_range - k, 0)
+                    else:
+                        payoffs += sign * qty * np.maximum(k - spot_range, 0)
+                
+                payoffs -= total_cost
+                
+                fig = go.Figure()
+                fig.add_trace(go.Scatter(x=spot_range, y=payoffs, mode='lines', name='Payoff at Expiry',
+                                         line=dict(color='#387ed1', width=3), fill='tozeroy', 
+                                         fillcolor='rgba(56, 126, 209, 0.1)'))
+                fig.add_vline(x=current_price, line_dash="dash", line_color="#e74c3c", annotation_text="Current Spot", annotation_position="top left")
+                fig.add_hline(y=0, line_color="black", line_width=1)
+                
+                fig.update_layout(
+                    xaxis_title="Underlying Price at Expiry",
+                    yaxis_title="Net Profit / Loss (₹)",
+                    height=300,
+                    margin=dict(l=20, r=20, t=30, b=20),
+                    plot_bgcolor="#ffffff",
+                    paper_bgcolor="#ffffff"
+                )
+                st.plotly_chart(fig, use_container_width=True)
+            else:
+                st.info("Add items to your basket or open positions to see the payoff diagram.")
 
             # Order Book (Pending Limits)
             st.markdown('<div class="section-title">Order Book (Pending Limits)</div>', unsafe_allow_html=True)
