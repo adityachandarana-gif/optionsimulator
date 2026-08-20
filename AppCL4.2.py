@@ -1394,7 +1394,30 @@ def main():
             st.markdown('<div class="section-title" style="color:#1a1a1a; margin-bottom:6px;">Place Order</div>', unsafe_allow_html=True)
 
             # --- Strategy Builder ---
-            strategy = st.selectbox("Strategy Template", ["Single Option", "Straddle", "Strangle", "Bull Call Spread", "Bear Put Spread"], key="strat_template")
+            STRATEGY_LIST = [
+                "Single Option",
+                "── Straddles ──",
+                "Long Straddle",
+                "Short Straddle",
+                "── Strangles ──",
+                "Long Strangle",
+                "Short Strangle",
+                "── Vertical Spreads ──",
+                "Bull Call Spread",
+                "Bull Put Spread",
+                "Bear Call Spread",
+                "Bear Put Spread",
+                "── Butterfly Spreads ──",
+                "Long Butterfly (Call)",
+                "Short Butterfly (Call)",
+                "Long Butterfly (Put)",
+                "Short Butterfly (Put)",
+                "── Box Spreads ──",
+                "Long Box",
+                "Short Box",
+            ]
+            strategy = st.selectbox("Strategy Template", STRATEGY_LIST, key="strat_template",
+                                    format_func=lambda x: x if not x.startswith("──") else x)
             
             # Clean tight order-entry row
             c1, c2, c3, c4, c5, c6 = st.columns([1.0, 0.9, 1.2, 0.8, 1.1, 1.0])
@@ -1437,126 +1460,203 @@ def main():
                         'ltp': ltp
                     }]
             else:
-                # Strategy descriptions for learning
-                strategy_info = {
-                    'Straddle':        ('📘 Buy ATM CE + Buy ATM PE. Profits from big moves in either direction. Max loss = total premium paid.', 1),
-                    'Strangle':        ('📘 Buy OTM CE + Buy OTM PE. Cheaper than straddle; needs a bigger move to profit.', 1),
-                    'Bull Call Spread': ('📘 Buy lower-strike CE + Sell higher-strike CE. Bullish view. Limits both max profit and max loss.', 2),
-                    'Bear Put Spread':  ('📘 Buy higher-strike PE + Sell lower-strike PE. Bearish view. Limits both max profit and max loss.', 2),
+                # ── helpers ─────────────────────────────────────────────────
+                def _get_px(k, typ):
+                    r = chain_df[chain_df['Strike'] == k]
+                    return float(r.iloc[0]['CE Price'] if typ == 'CE' else r.iloc[0]['PE Price']) if len(r) else 0.0
+
+                def _make_item(l_side, typ, k, qty):
+                    p = _get_px(k, typ)
+                    return {'side': l_side, 'type': typ, 'strike': k, 'lots': lots,
+                            'quantity': qty, 'price': p, 'order_type': 'MARKET', 'ltp': p}
+
+                def _net_label(legs_list):
+                    """legs_list = [(sign +1/-1, px), ...]  → net debit string"""
+                    net = sum(s * p for s, p in legs_list)
+                    colour = '#e74c3c' if net >= 0 else '#00a86b'
+                    label = f"Net {'Debit' if net >= 0 else 'Credit'}"
+                    return f"<div style='padding-top:4px;'><div style='font-size:10px;color:#666;'>{label}</div>" \
+                           f"<div style='font-size:14px;font-weight:700;color:{colour};'>₹{abs(net):.2f}</div></div>"
+
+                # ── strategy descriptions ───────────────────────────────────
+                STRATEGY_INFO = {
+                    'Long Straddle':       '📘 Buy ATM CE + Buy ATM PE. Profits from large moves either way. Max loss = total premium.',
+                    'Short Straddle':      '📘 Sell ATM CE + Sell ATM PE. Profits if underlying stays flat. Unlimited risk on both sides.',
+                    'Long Strangle':       '📘 Buy OTM CE + Buy OTM PE. Cheaper than straddle; needs a bigger move to profit.',
+                    'Short Strangle':      '📘 Sell OTM CE + Sell OTM PE. Profits from range-bound market. Max profit = premium received.',
+                    'Bull Call Spread':    '📘 Buy lower CE + Sell higher CE. Bullish, limited risk and limited profit.',
+                    'Bull Put Spread':     '📘 Sell higher PE + Buy lower PE. Bullish credit spread — collect premium and limit risk.',
+                    'Bear Call Spread':    '📘 Sell lower CE + Buy higher CE. Bearish credit spread — collect premium and limit risk.',
+                    'Bear Put Spread':     '📘 Buy higher PE + Sell lower PE. Bearish debit spread — profits as underlying falls.',
+                    'Long Butterfly (Call)':  '📘 Buy 1 low CE, Sell 2 mid CE, Buy 1 high CE. Max profit at mid strike. Low cost, range-bound.',
+                    'Short Butterfly (Call)': '📘 Sell 1 low CE, Buy 2 mid CE, Sell 1 high CE. Profits from large moves. Small credit received.',
+                    'Long Butterfly (Put)':   '📘 Buy 1 high PE, Sell 2 mid PE, Buy 1 low PE. Same payoff as call butterfly. Profits at mid strike.',
+                    'Short Butterfly (Put)':  '📘 Sell 1 high PE, Buy 2 mid PE, Sell 1 low PE. Profits from large moves away from mid strike.',
+                    'Long Box':            '📘 Bull Call Spread + Bear Put Spread at same strikes. Risk-free profit when mispriced. Cost = spread width.',
+                    'Short Box':           '📘 Bear Call Spread + Bull Put Spread at same strikes. Collects premium when box is overpriced.',
                 }
-                info_text, n_strikes = strategy_info.get(strategy, ('', 1))
-                st.info(info_text)
+                st.info(STRATEGY_INFO.get(strategy, ''))
 
-                # Determine which legs need a strike selector
-                if strategy in ('Straddle',):
-                    # Single strike — ATM
-                    s1col, _, s3col, _, s5col, s6col = st.columns([1.0, 0.9, 1.2, 0.8, 1.1, 1.0])
-                    with s3col:
-                        strike_atm = st.selectbox("ATM Strike", strikes, index=default_idx, key="ord_strike_atm")
-                    with s5col:
-                        order_type = "MARKET"
-                        st.caption("Market Order")
-                    with s6col:
-                        st.markdown("<div style='padding-top:8px; font-size:11px; color:#666;'>Auto-Priced</div>", unsafe_allow_html=True)
+                qty_base = lots * lot_size
+                order_type = "MARKET"
 
+                # ── STRADDLES (single ATM strike) ───────────────────────────
+                if strategy in ('Long Straddle', 'Short Straddle'):
+                    s1, _, s3, _, s5, s6 = st.columns([1.0, 0.9, 1.2, 0.8, 1.1, 1.0])
+                    with s3:
+                        k_atm = st.selectbox("ATM Strike", strikes, index=default_idx, key="k_atm")
+                    with s5: st.caption("Market Order")
+                    with s6:
+                        p_ce, p_pe = _get_px(k_atm, 'CE'), _get_px(k_atm, 'PE')
+                        sign = 1 if strategy == 'Long Straddle' else -1
+                        st.markdown(_net_label([(sign, p_ce), (sign, p_pe)]), unsafe_allow_html=True)
+                    leg_side = 'Buy' if strategy == 'Long Straddle' else 'Sell'
                     def _build_order_items():
-                        qty = lots * lot_size
-                        legs = [('Buy', 'CE', strike_atm), ('Buy', 'PE', strike_atm)]
-                        items = []
-                        for l_side, l_type, l_strike in legs:
-                            row = chain_df[chain_df['Strike'] == l_strike]
-                            if len(row):
-                                ltp_val = float(row.iloc[0]['CE Price'] if l_type == 'CE' else row.iloc[0]['PE Price'])
-                                items.append({'side': l_side, 'type': l_type, 'strike': l_strike, 'lots': lots, 'quantity': qty, 'price': ltp_val, 'order_type': 'MARKET', 'ltp': ltp_val})
-                        return items
+                        return [_make_item(leg_side, 'CE', k_atm, qty_base),
+                                _make_item(leg_side, 'PE', k_atm, qty_base)]
 
-                elif strategy == 'Strangle':
-                    s1col, s2col, s3col, _, s5col, s6col = st.columns([1.0, 0.9, 1.2, 0.8, 1.1, 1.0])
-                    with s1col:
-                        otm_ce_strike = st.selectbox("OTM CE Strike", [s for s in strikes if s >= atm_strike], index=0, key="ord_strike_ce")
-                    with s2col:
-                        otm_pe_strike = st.selectbox("OTM PE Strike", [s for s in strikes if s <= atm_strike], index=len([s for s in strikes if s <= atm_strike])-1, key="ord_strike_pe")
-                    with s3col:
-                        st.markdown(f"<div style='padding-top:28px; font-size:11px; color:#555;'>CE: {otm_ce_strike} | PE: {otm_pe_strike}</div>", unsafe_allow_html=True)
-                    with s5col:
-                        order_type = "MARKET"
-                        st.caption("Market Order")
-                    with s6col:
-                        st.markdown("<div style='padding-top:8px; font-size:11px; color:#666;'>Auto-Priced</div>", unsafe_allow_html=True)
-
+                # ── STRANGLES (OTM CE + OTM PE) ────────────────────────────
+                elif strategy in ('Long Strangle', 'Short Strangle'):
+                    s1, s2, s3, _, s5, s6 = st.columns([1.0, 0.9, 1.2, 0.8, 1.1, 1.0])
+                    ce_strikes = [s for s in strikes if s >= atm_strike]
+                    pe_strikes = [s for s in strikes if s <= atm_strike]
+                    with s1:
+                        k_ce = st.selectbox("OTM CE Strike", ce_strikes, index=0, key="k_ce")
+                    with s2:
+                        k_pe = st.selectbox("OTM PE Strike", pe_strikes, index=len(pe_strikes)-1, key="k_pe")
+                    with s5: st.caption("Market Order")
+                    with s6:
+                        sign = 1 if strategy == 'Long Strangle' else -1
+                        st.markdown(_net_label([(sign, _get_px(k_ce,'CE')), (sign, _get_px(k_pe,'PE'))]), unsafe_allow_html=True)
+                    leg_side = 'Buy' if strategy == 'Long Strangle' else 'Sell'
                     def _build_order_items():
-                        qty = lots * lot_size
-                        legs = [('Buy', 'CE', otm_ce_strike), ('Buy', 'PE', otm_pe_strike)]
-                        items = []
-                        for l_side, l_type, l_strike in legs:
-                            row = chain_df[chain_df['Strike'] == l_strike]
-                            if len(row):
-                                ltp_val = float(row.iloc[0]['CE Price'] if l_type == 'CE' else row.iloc[0]['PE Price'])
-                                items.append({'side': l_side, 'type': l_type, 'strike': l_strike, 'lots': lots, 'quantity': qty, 'price': ltp_val, 'order_type': 'MARKET', 'ltp': ltp_val})
-                        return items
+                        return [_make_item(leg_side, 'CE', k_ce, qty_base),
+                                _make_item(leg_side, 'PE', k_pe, qty_base)]
 
+                # ── BULL CALL SPREAD (Buy low CE, Sell high CE) ─────────────
                 elif strategy == 'Bull Call Spread':
-                    s1col, s2col, _, _, s5col, s6col = st.columns([1.0, 0.9, 1.2, 0.8, 1.1, 1.0])
-                    with s1col:
-                        buy_strike = st.selectbox("Buy CE (lower)", strikes, index=default_idx, key="ord_strike_buy")
-                    # Only allow sell strike higher than buy strike
-                    sell_strikes = [s for s in strikes if s > buy_strike]
-                    sell_default = 0
-                    with s2col:
-                        sell_strike = st.selectbox("Sell CE (higher)", sell_strikes if sell_strikes else strikes, index=sell_default, key="ord_strike_sell")
-                    with s5col:
-                        order_type = "MARKET"
-                        st.caption("Market Order")
-                    with s6col:
-                        # Show net debit
-                        buy_row = chain_df[chain_df['Strike'] == buy_strike]
-                        sell_row = chain_df[chain_df['Strike'] == sell_strike] if sell_strikes else pd.DataFrame()
-                        buy_px = float(buy_row.iloc[0]['CE Price']) if len(buy_row) else 0
-                        sell_px = float(sell_row.iloc[0]['CE Price']) if len(sell_row) else 0
-                        net = buy_px - sell_px
-                        st.markdown(f"<div style='padding-top:4px;'><div style='font-size:10px;color:#666;'>Net Debit/lot</div><div style='font-size:15px;font-weight:700;color:#e74c3c;'>₹{net:.2f}</div></div>", unsafe_allow_html=True)
-
+                    s1, s2, _, _, s5, s6 = st.columns([1.0, 0.9, 1.2, 0.8, 1.1, 1.0])
+                    with s1:
+                        k_buy = st.selectbox("Buy CE (lower)", strikes, index=default_idx, key="k_buy")
+                    hi_strikes = [s for s in strikes if s > k_buy]
+                    with s2:
+                        k_sell = st.selectbox("Sell CE (higher)", hi_strikes or strikes, index=0, key="k_sell")
+                    with s5: st.caption("Market Order")
+                    with s6:
+                        st.markdown(_net_label([(1, _get_px(k_buy,'CE')), (-1, _get_px(k_sell,'CE'))]), unsafe_allow_html=True)
                     def _build_order_items():
-                        qty = lots * lot_size
-                        legs = [('Buy', 'CE', buy_strike), ('Sell', 'CE', sell_strike)]
-                        items = []
-                        for l_side, l_type, l_strike in legs:
-                            row = chain_df[chain_df['Strike'] == l_strike]
-                            if len(row):
-                                ltp_val = float(row.iloc[0]['CE Price'])
-                                items.append({'side': l_side, 'type': l_type, 'strike': l_strike, 'lots': lots, 'quantity': qty, 'price': ltp_val, 'order_type': 'MARKET', 'ltp': ltp_val})
-                        return items
+                        return [_make_item('Buy','CE',k_buy,qty_base), _make_item('Sell','CE',k_sell,qty_base)]
 
+                # ── BULL PUT SPREAD (Sell high PE, Buy low PE) ──────────────
+                elif strategy == 'Bull Put Spread':
+                    s1, s2, _, _, s5, s6 = st.columns([1.0, 0.9, 1.2, 0.8, 1.1, 1.0])
+                    with s1:
+                        k_sell = st.selectbox("Sell PE (higher)", strikes, index=default_idx, key="k_sell")
+                    lo_strikes = [s for s in strikes if s < k_sell]
+                    with s2:
+                        k_buy = st.selectbox("Buy PE (lower)", lo_strikes or strikes, index=len(lo_strikes)-1 if lo_strikes else 0, key="k_buy")
+                    with s5: st.caption("Market Order")
+                    with s6:
+                        st.markdown(_net_label([(-1, _get_px(k_sell,'PE')), (1, _get_px(k_buy,'PE'))]), unsafe_allow_html=True)
+                    def _build_order_items():
+                        return [_make_item('Sell','PE',k_sell,qty_base), _make_item('Buy','PE',k_buy,qty_base)]
+
+                # ── BEAR CALL SPREAD (Sell low CE, Buy high CE) ─────────────
+                elif strategy == 'Bear Call Spread':
+                    s1, s2, _, _, s5, s6 = st.columns([1.0, 0.9, 1.2, 0.8, 1.1, 1.0])
+                    with s1:
+                        k_sell = st.selectbox("Sell CE (lower)", strikes, index=default_idx, key="k_sell")
+                    hi_strikes = [s for s in strikes if s > k_sell]
+                    with s2:
+                        k_buy = st.selectbox("Buy CE (higher)", hi_strikes or strikes, index=0, key="k_buy")
+                    with s5: st.caption("Market Order")
+                    with s6:
+                        st.markdown(_net_label([(-1, _get_px(k_sell,'CE')), (1, _get_px(k_buy,'CE'))]), unsafe_allow_html=True)
+                    def _build_order_items():
+                        return [_make_item('Sell','CE',k_sell,qty_base), _make_item('Buy','CE',k_buy,qty_base)]
+
+                # ── BEAR PUT SPREAD (Buy high PE, Sell low PE) ──────────────
                 elif strategy == 'Bear Put Spread':
-                    s1col, s2col, _, _, s5col, s6col = st.columns([1.0, 0.9, 1.2, 0.8, 1.1, 1.0])
-                    with s1col:
-                        buy_strike = st.selectbox("Buy PE (higher)", strikes, index=default_idx, key="ord_strike_buy")
-                    sell_strikes = [s for s in strikes if s < buy_strike]
-                    with s2col:
-                        sell_strike = st.selectbox("Sell PE (lower)", sell_strikes if sell_strikes else strikes, index=len(sell_strikes)-1 if sell_strikes else 0, key="ord_strike_sell")
-                    with s5col:
-                        order_type = "MARKET"
-                        st.caption("Market Order")
-                    with s6col:
-                        buy_row = chain_df[chain_df['Strike'] == buy_strike]
-                        sell_row = chain_df[chain_df['Strike'] == sell_strike] if sell_strikes else pd.DataFrame()
-                        buy_px = float(buy_row.iloc[0]['PE Price']) if len(buy_row) else 0
-                        sell_px = float(sell_row.iloc[0]['PE Price']) if len(sell_row) else 0
-                        net = buy_px - sell_px
-                        st.markdown(f"<div style='padding-top:4px;'><div style='font-size:10px;color:#666;'>Net Debit/lot</div><div style='font-size:15px;font-weight:700;color:#e74c3c;'>₹{net:.2f}</div></div>", unsafe_allow_html=True)
-
+                    s1, s2, _, _, s5, s6 = st.columns([1.0, 0.9, 1.2, 0.8, 1.1, 1.0])
+                    with s1:
+                        k_buy = st.selectbox("Buy PE (higher)", strikes, index=default_idx, key="k_buy")
+                    lo_strikes = [s for s in strikes if s < k_buy]
+                    with s2:
+                        k_sell = st.selectbox("Sell PE (lower)", lo_strikes or strikes, index=len(lo_strikes)-1 if lo_strikes else 0, key="k_sell")
+                    with s5: st.caption("Market Order")
+                    with s6:
+                        st.markdown(_net_label([(1, _get_px(k_buy,'PE')), (-1, _get_px(k_sell,'PE'))]), unsafe_allow_html=True)
                     def _build_order_items():
-                        qty = lots * lot_size
-                        legs = [('Buy', 'PE', buy_strike), ('Sell', 'PE', sell_strike)]
-                        items = []
-                        for l_side, l_type, l_strike in legs:
-                            row = chain_df[chain_df['Strike'] == l_strike]
-                            if len(row):
-                                ltp_val = float(row.iloc[0]['PE Price'])
-                                items.append({'side': l_side, 'type': l_type, 'strike': l_strike, 'lots': lots, 'quantity': qty, 'price': ltp_val, 'order_type': 'MARKET', 'ltp': ltp_val})
-                        return items
+                        return [_make_item('Buy','PE',k_buy,qty_base), _make_item('Sell','PE',k_sell,qty_base)]
 
-                else:
+                # ── BUTTERFLY SPREADS (3 strikes: low, mid, high) ───────────
+                elif strategy in ('Long Butterfly (Call)','Short Butterfly (Call)',
+                                  'Long Butterfly (Put)', 'Short Butterfly (Put)'):
+                    is_call = '(Call)' in strategy
+                    is_long = strategy.startswith('Long')
+                    typ = 'CE' if is_call else 'PE'
+
+                    s1, s2, s3, _, s5, s6 = st.columns([1.0, 0.9, 1.2, 0.8, 1.1, 1.0])
+                    with s1:
+                        k_low = st.selectbox("Low Strike", strikes, index=max(0, default_idx-1), key="k_low")
+                    mid_opts = [s for s in strikes if s > k_low]
+                    with s2:
+                        k_mid = st.selectbox("Mid Strike (body)", mid_opts or strikes, index=0, key="k_mid")
+                    hi_opts = [s for s in strikes if s > k_mid]
+                    with s3:
+                        k_high = st.selectbox("High Strike", hi_opts or strikes, index=0, key="k_high")
+                    with s5: st.caption("Market Order")
+                    with s6:
+                        b, m, h = _get_px(k_low,typ), _get_px(k_mid,typ), _get_px(k_high,typ)
+                        if is_long:
+                            net_sign = [(1,b),(-2,m),(1,h)]
+                        else:
+                            net_sign = [(-1,b),(2,m),(-1,h)]
+                        st.markdown(_net_label(net_sign), unsafe_allow_html=True)
+                    if is_long:
+                        wing_side, body_side = 'Buy', 'Sell'
+                    else:
+                        wing_side, body_side = 'Sell', 'Buy'
+                    def _build_order_items():
+                        return [
+                            _make_item(wing_side, typ, k_low, qty_base),
+                            _make_item(body_side, typ, k_mid, qty_base * 2),
+                            _make_item(wing_side, typ, k_high, qty_base),
+                        ]
+
+                # ── BOX SPREADS (4 legs: 2 strikes, CE+PE) ──────────────────
+                elif strategy in ('Long Box', 'Short Box'):
+                    # Long Box  = Bull Call Spread + Bear Put Spread (buy)
+                    # Short Box = Bear Call Spread + Bull Put Spread (sell)
+                    s1, s2, _, _, s5, s6 = st.columns([1.0, 0.9, 1.2, 0.8, 1.1, 1.0])
+                    with s1:
+                        k_low = st.selectbox("Lower Strike", strikes, index=max(0,default_idx-1), key="k_low")
+                    hi_opts = [s for s in strikes if s > k_low]
+                    with s2:
+                        k_high = st.selectbox("Higher Strike", hi_opts or strikes, index=0, key="k_high")
+                    with s5: st.caption("Market Order")
+                    with s6:
+                        lce, hce = _get_px(k_low,'CE'), _get_px(k_high,'CE')
+                        lpe, hpe = _get_px(k_low,'PE'), _get_px(k_high,'PE')
+                        if strategy == 'Long Box':
+                            net_legs = [(1,lce),(-1,hce),(1,hpe),(-1,lpe)]
+                        else:
+                            net_legs = [(-1,lce),(1,hce),(-1,hpe),(1,lpe)]
+                        st.markdown(_net_label(net_legs), unsafe_allow_html=True)
+                    if strategy == 'Long Box':
+                        def _build_order_items():
+                            return [
+                                _make_item('Buy','CE',k_low,qty_base), _make_item('Sell','CE',k_high,qty_base),
+                                _make_item('Buy','PE',k_high,qty_base), _make_item('Sell','PE',k_low,qty_base),
+                            ]
+                    else:
+                        def _build_order_items():
+                            return [
+                                _make_item('Sell','CE',k_low,qty_base), _make_item('Buy','CE',k_high,qty_base),
+                                _make_item('Sell','PE',k_high,qty_base), _make_item('Buy','PE',k_low,qty_base),
+                            ]
+
+                else:  # separator rows selected — do nothing
                     def _build_order_items():
                         return []
 
